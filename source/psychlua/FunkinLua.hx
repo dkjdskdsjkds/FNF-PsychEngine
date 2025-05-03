@@ -22,6 +22,7 @@ import objects.StrumNote;
 import objects.Note;
 import objects.NoteSplash;
 import objects.Character;
+import objects.HealthIcon;
 
 import states.MainMenuState;
 import states.StoryMenuState;
@@ -1037,6 +1038,24 @@ class FunkinLua {
 					GameOverSubstate.instance.insert(GameOverSubstate.instance.members.indexOf(GameOverSubstate.instance.boyfriend), mySprite);
 			}
 		});
+		Lua_helper.add_callback(lua, "makeLuaCharacter", function(tag:String, character:String, isPlayer:Bool = false, ?flipped:Bool = false) {
+			makeLuaCharacter(tag, character, isPlayer, flipped);
+		});
+		Lua_helper.add_callback(lua, "makeHealthIcon", function(tag:String, character:String, player:Bool = false) {
+			makeIcon(tag, character, player);
+		});
+		Lua_helper.add_callback(lua, "changeIcon", function(tag:String, character:String){
+			var shit:HealthIcon = game.variables.get(tag);
+			shit.changeIcon(character);
+		});
+		Lua_helper.add_callback(lua,"characterZoom", function(id:String, zoomAmount:Float, ?isSenpai:Bool = false) {
+			if(PlayState.instance.modchartCharacters.exists(id)) {
+				var spr:Character = PlayState.instance.modchartCharacters.get(id);
+				spr.setZoom(zoomAmount, isSenpai);
+			}
+			else
+				LuaUtils.getObjectDirectly(id).setZoom(zoomAmount, isSenpai);
+		});
 		Lua_helper.add_callback(lua, "setGraphicSize", function(obj:String, x:Float, y:Float = 0, updateHitbox:Bool = true) {
 			if(game.getLuaObject(obj)!=null) {
 				var shit:FlxSprite = game.getLuaObject(obj);
@@ -1862,6 +1881,206 @@ class FunkinLua {
 		luaTrace('This platform doesn\'t support Runtime Shaders!', false, false, FlxColor.RED);
 		#end
 		return false;
+	}
+
+	public static function makeIcon(tag:String, character:String, isPlayer:Bool) // making it as a standalone function so i can use on other states
+	{
+		tag = tag.replace('.', '');
+		LuaUtils.destroyObject(tag);
+		var leSprite:HealthIcon = new HealthIcon(character, isPlayer);
+		PlayState.instance.variables.set(tag, leSprite); //yes
+		var shit:HealthIcon = PlayState.instance.variables.get(tag);
+		shit.cameras = [PlayState.instance.camHUD];
+		LuaUtils.getTargetInstance().add(shit);
+	}
+
+	public static function makeLuaCharacter(tag:String, character:String, isPlayer:Bool = false, flipped:Bool = false) {
+		tag = tag.replace('.', '');
+
+		var animationName:String = "no way anyone have an anim name this big";
+		var animationFrame:Int = 0;	
+		var position:Int = -1;
+
+		if (PlayState.instance.modchartCharacters.get(tag) != null)
+		{
+			var daChar:Character = PlayState.instance.modchartCharacters.get(tag);
+			animationName = daChar.animation.curAnim.name;
+			animationFrame = daChar.animation.curAnim.curFrame;
+			position = LuaUtils.getTargetInstance().members.indexOf(daChar);
+		}
+
+		LuaUtils.resetCharacterTag(tag);
+		var leSprite:Character = new Character(0, 0, character, isPlayer);
+		//leSprite.flipMode = flipped;
+		PlayState.instance.modchartCharacters.set(tag, leSprite); //yes
+		var shit:Character = PlayState.instance.modchartCharacters.get(tag);
+		LuaUtils.getTargetInstance().add(shit);
+
+		if (position >= 0) //this should keep them in the same spot if they switch
+		{
+			LuaUtils.getTargetInstance().remove(shit, true);
+			LuaUtils.getTargetInstance().insert(position, shit);
+		}
+
+		var stageData:StageFile = StageData.getStageFile(PlayState.SONG.stage);
+		var charX:Float = 0;
+		var charY:Float = (flipped ? 350 : 0);
+
+		if (!isPlayer)
+		{
+			//if (flipped) shit.flipMode = true;
+
+			charX = shit.positionArray[0];
+			charY = shit.positionArray[1];
+
+			shit.x = stageData.opponent[0] + charX;
+			shit.y = stageData.opponent[1] + charY;
+		}
+		else
+		{
+			//if (flipped) shit.flipMode = true;
+
+			var charX:Float = 0;
+			var charY:Float =  (!flipped ? 0 : 350);
+
+			charX = shit.positionArray[0];
+			charY = shit.positionArray[1];
+
+			shit.x = stageData.boyfriend[0] + charX;
+			shit.y = stageData.boyfriend[1] + charY;
+		}
+
+		if (shit.animOffsets.exists(animationName)) shit.playAnim(animationName, true, false, animationFrame);
+
+		//PlayState.instance.startCharacterLua(shit.curCharacter);
+	}
+
+	//trying to do some auto stuff so i don't have to set manual x and y values
+	public static function changeBFAuto(id:String, ?flipped:Bool = false, ?dontDestroy:Bool = false) {	
+		var animationName:String = "no way anyone have an anim name this big";
+		var animationFrame:Int = 0;						
+		if (PlayState.instance.boyfriend.animation.curAnim.name.startsWith('sing'))
+		{
+			animationName = PlayState.instance.boyfriend.animation.curAnim.name;
+			animationFrame = PlayState.instance.boyfriend.animation.curAnim.curFrame;
+		}
+
+		PlayState.instance.remove(PlayState.instance.boyfriend);
+		PlayState.instance.boyfriend.destroy();
+		PlayState.instance.boyfriend = new Character(0, 0, id, !flipped);
+		PlayState.instance.boyfriend.flipMode = !flipped;
+
+		var isFlipped = PlayState.instance.boyfriend.flipMode;
+		var stageData:StageFile = StageData.getStageFile(PlayState.SONG.stage);
+		var charX:Float = 0;
+		var charY:Float = (isFlipped ? 350 : 0);
+
+		var charX:Float = 0;
+		var charY:Float =  (!isFlipped ? 0 : 350);
+
+		charX = PlayState.instance.boyfriend.positionArray[0];
+		charY = PlayState.instance.boyfriend.positionArray[1];
+
+		PlayState.instance.boyfriend.x = stageData.boyfriend[0] + charX;
+		PlayState.instance.boyfriend.y = stageData.boyfriend[1] + charY;
+
+		PlayState.instance.add(PlayState.instance.boyfriend);
+
+		PlayState.instance.iconP1.changeIcon(PlayState.instance.boyfriend.healthIcon);
+
+		/*if (PlayState.instance.defaultBar)
+		{
+			var dad = PlayState.instance.dad;
+			var boyfriend = PlayState.instance.boyfriend;
+			
+			PlayState.instance.healthBar.createFilledBar(FlxColor.fromRGB(dad.healthColorArray[0], dad.healthColorArray[1], dad.healthColorArray[2]), FlxColor.fromRGB(boyfriend.healthColorArray[0], boyfriend.healthColorArray[1], boyfriend.healthColorArray[2]));
+			PlayState.instance.healthBar.updateBar();
+		}	*/
+		PlayState.instance.reloadHealthBarColors();
+
+		if (PlayState.instance.boyfriend.animOffsets.exists(animationName))
+			PlayState.instance.boyfriend.playAnim(animationName, true, false, animationFrame);
+
+		PlayState.instance.setOnScripts('boyfriendName', PlayState.instance.boyfriend.curCharacter);
+		// PlayState.instance.startCharacterLua(PlayState.instance.boyfriend.curCharacter);
+	}
+
+	public static function changeDadAuto(id:String, ?flipped:Bool = false, ?dontDestroy:Bool = false) {	
+		var animationName:String = "no way anyone have an anim name this big";
+		var animationFrame:Int = 0;						
+		if (PlayState.instance.dad.animation.curAnim.name.startsWith('sing'))
+		{
+			animationName = PlayState.instance.dad.animation.curAnim.name;
+			animationFrame = PlayState.instance.dad.animation.curAnim.curFrame;
+		}
+
+		PlayState.instance.remove(PlayState.instance.dad);
+		PlayState.instance.dad.destroy();
+		PlayState.instance.dad = new Character(0, 0, id, flipped);
+		PlayState.instance.dad.flipMode = !flipped;
+
+		var isFlipped = PlayState.instance.dad.flipMode;
+		var stageData:StageFile = StageData.getStageFile(PlayState.SONG.stage);
+		var charX:Float = 0;
+		var charY:Float = (isFlipped ? 350 : 0);
+
+		var charX:Float = 0;
+		var charY:Float =  (!isFlipped ? 0 : 350);
+
+		charX = PlayState.instance.dad.positionArray[0];
+		charY = PlayState.instance.dad.positionArray[1];
+
+		PlayState.instance.dad.x = stageData.opponent[0] + charX;
+		PlayState.instance.dad.y = stageData.opponent[1] + charY;
+
+		//PlayState.instance.addObject(PlayState.instance.bfTrail);
+		//PlayState.instance.bfTrail.resetTrail();
+		PlayState.instance.add(PlayState.instance.dad);
+
+		PlayState.instance.iconP2.changeIcon(PlayState.instance.dad.healthIcon);
+
+		/*if (PlayState.instance.defaultBar)
+		{
+			var dad = PlayState.instance.dad;
+			var boyfriend = PlayState.instance.boyfriend;
+			
+			PlayState.instance.healthBar.createFilledBar(FlxColor.fromRGB(dad.healthColorArray[0], dad.healthColorArray[1], dad.healthColorArray[2]), FlxColor.fromRGB(boyfriend.healthColorArray[0], boyfriend.healthColorArray[1], boyfriend.healthColorArray[2]));
+			PlayState.instance.healthBar.updateBar();
+		}*/
+
+		PlayState.instance.reloadHealthBarColors();
+
+		if (PlayState.instance.dad.animOffsets.exists(animationName))
+			PlayState.instance.dad.playAnim(animationName, true, false, animationFrame);
+
+		PlayState.instance.setOnScripts('dadName', PlayState.instance.dad.curCharacter);
+		// PlayState.instance.startCharacterLua(PlayState.instance.dad.curCharacter);
+	}
+
+	public static function changeGFAuto(id:String, ?flipped:Bool = false, ?dontDestroy:Bool = false) { // not tested but i'm almost 100% sure it works		
+		var animationName:String = "no way anyone have an anim name this big";
+		var animationFrame:Int = 0;						
+		if (PlayState.instance.gf.animation.curAnim.name.startsWith('sing'))
+		{
+			animationName = PlayState.instance.gf.animation.curAnim.name;
+			animationFrame = PlayState.instance.gf.animation.curAnim.curFrame;
+		}
+
+		PlayState.instance.remove(PlayState.instance.gf);
+		PlayState.instance.gf.destroy();
+		PlayState.instance.gf = new Character(0, 0, id, flipped);
+		PlayState.instance.gf.flipMode = flipped;
+		var stageData:StageFile = StageData.getStageFile(PlayState.instance.curStage);
+		PlayState.instance.gf.x = stageData.girlfriend[0] + PlayState.instance.gf.positionArray[0];
+		PlayState.instance.gf.y = stageData.girlfriend[1] + PlayState.instance.gf.positionArray[1];
+		// PlayState.instance.gf.scrollFactor.set(0.95, 0.95);
+		PlayState.instance.add(PlayState.instance.gf);
+
+		if (PlayState.instance.gf.animOffsets.exists(animationName))
+			PlayState.instance.gf.playAnim(animationName, true, false, animationFrame);
+
+		PlayState.instance.setOnScripts('gfName', PlayState.instance.gf.curCharacter);
+		// PlayState.instance.startCharacterLua(PlayState.instance.gf.curCharacter);
 	}
 }
 #end

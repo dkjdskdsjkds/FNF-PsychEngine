@@ -1,5 +1,7 @@
 package psychlua;
 
+import objects.HealthIcon;
+
 //
 // This is simply where i store deprecated functions for it to be more organized.
 // I would suggest not messing with these, as it could break mods.
@@ -59,6 +61,17 @@ class DeprecatedFunctions
 				}
 			}
 		});
+		Lua_helper.add_callback(lua, "changeAddedIcon", function(tag:String, character:String){
+			var shit:HealthIcon = PlayState.instance.variables.get(tag);
+			shit.changeIcon(character);
+		});
+		Lua_helper.add_callback(lua, "makeLuaIcon", function(tag:String, character:String, player:Bool = false) {
+			FunkinLua.makeIcon(tag, character, player);
+		});
+		Lua_helper.add_callback(lua, "changeLuaIcon", function(tag:String, character:String){
+			var shit:HealthIcon = PlayState.instance.variables.get(tag);
+			shit.changeIcon(character);
+		});
 		Lua_helper.add_callback(lua, "luaSpriteAddAnimationByIndices", function(tag:String, name:String, prefix:String, indices:String, framerate:Int = 24) {
 			FunkinLua.luaTrace("luaSpriteAddAnimationByIndices is deprecated! Use addAnimationByIndices instead", false, true);
 			if(MusicBeatState.getVariables().exists(tag)) {
@@ -73,6 +86,21 @@ class DeprecatedFunctions
 					pussy.animation.play(name, true);
 				}
 			}
+		});
+		Lua_helper.add_callback(lua, "updateHealthbar", function(?left:String = "", ?right:String = "") { // directly from betadciu engine -- future me here: old code didn't worked so i just pasted the new one
+			if (left.length == 8) left = left.substring(left.length-2);
+			else if (left.length == 10) left = left.substring(left.length-4);
+
+			if (right.length == 8) right = right.substring(right.length-2);
+			else if (right.length == 10) right = right.substring(right.length-4);
+
+			var left_color:Null<FlxColor> = null;
+			var right_color:Null<FlxColor> = null;
+			if (left != null && left != '')
+				left_color = CoolUtil.colorFromString(left);
+			if (right != null && right != '')
+				right_color = CoolUtil.colorFromString(right);
+			PlayState.instance.healthBar.setColors(left_color, right_color);
 		});
 		Lua_helper.add_callback(lua, "luaSpritePlayAnimation", function(tag:String, name:String, forced:Bool = false) {
 			FunkinLua.luaTrace("luaSpritePlayAnimation is deprecated! Use playAnim instead", false, true);
@@ -156,6 +184,68 @@ class DeprecatedFunctions
 			}
 			Reflect.getProperty(LuaUtils.getTargetInstance(), group)[index].updateHitbox();
 			FunkinLua.luaTrace('updateHitboxFromGroup is deprecated! Use updateHitbox instead.', false, true);
+		});
+		Lua_helper.add_callback(lua,"changeBFAuto", function(?id:String="bf", ?flipped:Bool=false) {
+			FunkinLua.changeBFAuto(id, flipped);
+			FunkinLua.luaTrace('changeBFAuto is deprecated! Use changeCharacter instead.', false, true);
+		});
+		Lua_helper.add_callback(lua,"changeBoyfriendAuto", function(?id:String="bf", ?flipped:Bool=false) {
+			FunkinLua.changeBFAuto(id, flipped);
+			FunkinLua.luaTrace('changeBoyfriendAuto is deprecated! Use changeCharacter instead.', false, true);
+		});
+		Lua_helper.add_callback(lua,"changeDadAuto", function(?id:String="bf", ?flipped:Bool=false) {
+			FunkinLua.changeDadAuto(id, flipped);
+			FunkinLua.luaTrace('changeDadAuto is deprecated! Use changeCharacter instead.', false, true);
+		});
+		Lua_helper.add_callback(lua,"changeGFAuto", function(?id:String="bf", ?flipped:Bool=false) {
+			FunkinLua.changeGFAuto(id, flipped);
+			FunkinLua.luaTrace('changeGFAuto is deprecated! Use changeCharacter instead.', false, true);
+		});		
+		Lua_helper.add_callback(lua, "changeLuaCharacter", function(tag:String, character:String){
+			var shit:Character = PlayState.instance.modchartCharacters.get(tag);
+			if(shit != null) FunkinLua.makeLuaCharacter(tag, character, shit.isPlayer, shit.flipMode);
+			else FunkinLua.luaTrace("changeLuaCharacter: " + tag + " doesn't exist!", false, false, FlxColor.RED);
+			FunkinLua.luaTrace('changeLuaCharacter is deprecated! Use changeCharacter instead.', false, true);
+		});
+		Lua_helper.add_callback(lua,"setCamFollow", function(?x:Float, ?y:Float) {
+			var trueX = x;
+			var trueY = y;
+			PlayState.instance.isCameraOnForcedPos = false;
+			if(trueX != null || trueX != null)
+			{
+				PlayState.instance.isCameraOnForcedPos = true;
+				PlayState.instance.camFollow.x = trueX;
+				PlayState.instance.camFollow.y = trueY;
+				FunkinLua.luaTrace('setCamFollow is deprecated! Use setCameraFollowPoint instead.', false, true);
+				return;
+			}
+			FunkinLua.luaTrace('setCamFollow: Camera Follow Cannot be set to null.', false, true, FlxColor.RED);
+		});
+		Lua_helper.add_callback(lua, "getActorXMidpoint", function(variable:String) { // im not porting the other kade reflect stuff. im just porting this because some scripts still uses this... yeah, even with the getMidPointX available
+			var killMe:Array<String> = variable.split('.');
+			var obj:FlxSprite = LuaUtils.getObjectDirectly(killMe[0]);
+			if(killMe.length > 1) {
+				obj = LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(killMe), killMe[killMe.length-1]);
+			}
+			if(obj != null) {
+				return obj.getMidpoint().x;
+				FunkinLua.luaTrace('getActorXMidpoint is deprecated! Use getMidPointX instead.', false, true);
+			}
+
+			return 0;
+		});
+		Lua_helper.add_callback(lua, "getActorYMidpoint", function(variable:String) { // im not porting the other kade reflect stuff. im just porting this because some scripts still uses this... yeah, even with the getMidPointY available
+			var killMe:Array<String> = variable.split('.');
+			var obj:FlxSprite = LuaUtils.getObjectDirectly(killMe[0]);
+			if(killMe.length > 1) {
+				obj = LuaUtils.getVarInArray(LuaUtils.getPropertyLoop(killMe), killMe[killMe.length-1]);
+			}
+			if(obj != null) {
+				return obj.getMidpoint().y;
+				FunkinLua.luaTrace('getActorYMidpoint is deprecated! Use getMidPointY instead.', false, true);
+			}
+
+			return 0;
 		});
 	}
 }
