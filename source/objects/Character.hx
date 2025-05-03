@@ -54,6 +54,7 @@ class Character extends FlxSprite
 	public var extraData:Map<String, Dynamic> = new Map<String, Dynamic>();
 
 	public var isPlayer:Bool = false;
+	public var flipMode:Bool = false;
 	public var curCharacter:String = DEFAULT_CHARACTER;
 
 	public var daZoom:Float = 1;
@@ -144,6 +145,10 @@ class Character extends FlxSprite
 		catch(e:Dynamic)
 		{
 			trace('Error loading character file of "$character": $e');
+		}
+		
+		for (i in ['flipMode', 'stopIdle', 'skipDance', 'specialAnim', 'stunned']){
+			Reflect.setProperty(this, i, false);		
 		}
 
 		skipDance = false;

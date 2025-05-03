@@ -1,6 +1,8 @@
 package psychlua;
 
+import objects.Character;
 import objects.HealthIcon;
+import flixel.FlxObject;
 
 //
 // This is simply where i store deprecated functions for it to be more organized.

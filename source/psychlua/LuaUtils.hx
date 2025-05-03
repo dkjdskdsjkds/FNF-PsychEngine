@@ -328,6 +328,20 @@ class LuaUtils
 		return false;
 	}
 	
+	public static function resetCharacterTag(tag:String) {
+		#if LUA_ALLOWED
+		if(!PlayState.instance.modchartCharacters.exists(tag)) {
+			return;
+		}
+		
+		var pee:Dynamic = PlayState.instance.modchartCharacters.get(tag);
+		pee.kill();
+		PlayState.instance.remove(pee, true);
+		pee.destroy();
+		PlayState.instance.modchartCharacters.remove(tag);
+		#end
+	}
+	
 	public static function loadFrames(spr:FlxSprite, image:String, spriteType:String)
 	{
 		switch(spriteType.toLowerCase().replace(' ', ''))

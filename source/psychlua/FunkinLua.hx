@@ -1,6 +1,7 @@
 #if LUA_ALLOWED
 package psychlua;
 
+import backend.StageData;
 import backend.WeekData;
 import backend.Highscore;
 import backend.Song;
@@ -12,8 +13,10 @@ import flixel.FlxBasic;
 import flixel.FlxObject;
 import flixel.FlxState;
 
+import flixel.addons.display.FlxBackdrop;
 #if (!flash && sys)
 import flixel.addons.display.FlxRuntimeShader;
+import openfl.filters.ShaderFilter;
 #end
 
 import cutscenes.DialogueBoxPsych;
@@ -22,6 +25,7 @@ import objects.StrumNote;
 import objects.Note;
 import objects.NoteSplash;
 import objects.Character;
+import objects.HealthIcon;
 import objects.HealthIcon;
 
 import states.MainMenuState;
@@ -48,6 +52,7 @@ class FunkinLua {
 	public var lua:State = null;
 	public var camTarget:FlxCamera;
 	public var scriptName:String = '';
+	public var scriptType:String = '';
 	public var modFolder:String = null;
 	public var closed:Bool = false;
 
@@ -58,7 +63,7 @@ class FunkinLua {
 	public var callbacks:Map<String, Dynamic> = new Map<String, Dynamic>();
 	public static var customFunctions:Map<String, Dynamic> = new Map<String, Dynamic>();
 
-	public function new(scriptName:String) {
+	public function new(scriptName:String, ?scriptType:String = "") {
 		lua = LuaL.newstate();
 		LuaL.openlibs(lua);
 
@@ -68,6 +73,8 @@ class FunkinLua {
 		//LuaL.dostring(lua, CLENSE);
 
 		this.scriptName = scriptName.trim();
+		this.scriptType = scriptType.trim();
+
 		var game:PlayState = PlayState.instance;
 		if(game != null) game.luaArray.push(this);
 
@@ -943,7 +950,20 @@ class FunkinLua {
 			{
 				leSprite.loadGraphic(Paths.image(image));
 			}
-			MusicBeatState.getVariables().set(tag, leSprite);
+
+			var variables = MusicBeatState.getVariables();
+			variables.set(tag, leSprite);
+
+			switch(scriptType.toLowerCase()){
+				case "stage":
+					if (!variables.exists("stageVariables")){
+						variables.set("stageVariables", new Map<String, FlxSprite>());
+					}
+		
+					var stageVars = variables.get("stageVariables");
+					stageVars.set(tag, leSprite);
+			}
+
 			leSprite.active = true;
 		});
 		Lua_helper.add_callback(lua, "makeAnimatedLuaSprite", function(tag:String, ?image:String = null, ?x:Float = 0, ?y:Float = 0, ?spriteType:String = 'auto') {
@@ -955,9 +975,44 @@ class FunkinLua {
 			{
 				LuaUtils.loadFrames(leSprite, image, spriteType);
 			}
-			MusicBeatState.getVariables().set(tag, leSprite);
-		});
 
+			var variables = MusicBeatState.getVariables();
+			variables.set(tag, leSprite);
+
+			switch(scriptType.toLowerCase()){
+				case "stage":
+					if (!variables.exists("stageVariables")){
+						variables.set("stageVariables", new Map<String, FlxSprite>());
+					}
+		
+					var stageVars = variables.get("stageVariables");
+					stageVars.set(tag, leSprite);
+			}
+		});
+		Lua_helper.add_callback(lua, "makeLuaBackdrop", function(tag:String, ?image:String = null, ?x:Float = 0, ?y:Float = 0, ?axes:String = "XY") {
+			tag = tag.replace('.', '');
+			LuaUtils.destroyObject(tag);
+			var leSprite:FlxBackdrop = new FlxBackdrop("", FlxAxes.fromString(axes), Std.int(x), Std.int(y));
+			if(image != null && image.length > 0)
+			{
+				leSprite.loadGraphic(Paths.image(image));
+			}
+
+			var variables = MusicBeatState.getVariables();
+			variables.set(tag, leSprite);
+
+			switch(scriptType.toLowerCase()){
+				case "stage":
+					if (!variables.exists("stageVariables")){
+						variables.set("stageVariables", new Map<String, FlxSprite>());
+					}
+		
+					var stageVars = variables.get("stageVariables");
+					stageVars.set(tag, leSprite);
+			}
+
+			leSprite.active = true;
+		});
 		Lua_helper.add_callback(lua, "makeGraphic", function(obj:String, width:Int = 256, height:Int = 256, color:String = 'FFFFFF') {
 			var spr:FlxSprite = LuaUtils.getObjectDirectly(obj);
 			if(spr != null) spr.makeGraphic(width, height, CoolUtil.colorFromString(color));
@@ -1751,6 +1806,72 @@ class FunkinLua {
 				return;
 			}
 			PlayState.instance.addTextToDebug(text, color);
+		}
+	}
+	
+	private function convert(v : Any, type : String) : Dynamic { // I didn't write this lol
+		if( Std.isOfType(v, String) && type != null ) {
+		var v : String = v;
+		if( type.substr(0, 4) == 'array' ) {
+			if( type.substr(4) == 'float' ) {
+			var array : Array<String> = v.split(',');
+			var array2 : Array<Float> = new Array();
+
+			for( vars in array ) {
+				array2.push(Std.parseFloat(vars));
+			}
+
+			return array2;
+			} else if( type.substr(4) == 'int' ) {
+			var array : Array<String> = v.split(',');
+			var array2 : Array<Int> = new Array();
+
+			for( vars in array ) {
+				array2.push(Std.parseInt(vars));
+			}
+
+			return array2;
+			} else {
+			var array : Array<String> = v.split(',');
+			return array;
+			}
+		} else if( type == 'float' ) {
+			return Std.parseFloat(v);
+		} else if( type == 'int' ) {
+			return Std.parseInt(v);
+		} else if( type == 'bool' ) {
+			if( v == 'true' ) {
+			return true;
+			} else {
+			return false;
+			}
+		} else {
+			return v;
+		}
+		} else {
+		return v;
+		}
+	}
+
+	public function get(var_name : String, type : String) : Dynamic {
+		if(lua == null) {
+			return false;
+		}
+
+		var result : Any = null;
+
+		// trace('getting variable ' + var_name + ' with a type of ' + type);
+
+		Lua.getglobal(lua, var_name);
+		result = Convert.fromLua(lua,-1);
+		Lua.pop(lua,1);
+
+		if( result == null ) {
+		return null;
+		} else {
+		var result = convert(result, type);
+		//trace(var_name + ' result: ' + result);
+		return result;
 		}
 	}
 

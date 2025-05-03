@@ -55,6 +55,25 @@ import crowplexus.hscript.Expr.Error as IrisError;
 import crowplexus.hscript.Printer;
 #end
 
+import sys.thread.Thread;
+
+#if sys
+import sys.FileSystem;
+#end
+
+typedef PreloadResult = {
+	var thread:Thread;
+	var asset:String;
+	@:optional var terminated:Bool;
+}
+
+typedef AssetPreload = {
+	var path:String;
+	@:optional var type:String;
+	@:optional var library:String;
+	@:optional var terminate:Bool;
+}
+
 /**
  * This is where all the Gameplay stuff happens and is managed
  *
@@ -90,7 +109,7 @@ class PlayState extends MusicBeatState
 	];
 
 	//event variables
-	private var isCameraOnForcedPos:Bool = false;
+	public var isCameraOnForcedPos:Bool = false;
 
 	public var boyfriendMap:Map<String, Character> = new Map<String, Character>();
 	public var dadMap:Map<String, Character> = new Map<String, Character>();
@@ -121,7 +140,8 @@ class PlayState extends MusicBeatState
 	public var boyfriendGroup:FlxSpriteGroup;
 	public var dadGroup:FlxSpriteGroup;
 	public var gfGroup:FlxSpriteGroup;
-	public static var curStage:String = '';
+	public var curStage:String = '';
+
 	public static var stageUI(default, set):String = "normal";
 	public static var uiPrefix:String = "";
 	public static var uiPostfix:String = "";
@@ -1325,6 +1345,7 @@ class PlayState extends MusicBeatState
 				swagNote.animSuffix = isAlt ? "-alt" : "";
 				swagNote.mustPress = gottaHitNote;
 				swagNote.sustainLength = holdLength;
+				swagNote.dType = section.dType;
 				swagNote.noteType = noteType;
 	
 				swagNote.scrollFactor.set();
@@ -1342,6 +1363,7 @@ class PlayState extends MusicBeatState
 						sustainNote.animSuffix = swagNote.animSuffix;
 						sustainNote.mustPress = swagNote.mustPress;
 						sustainNote.gfNote = swagNote.gfNote;
+						sustainNote.dType = swagNote.dType;
 						sustainNote.noteType = swagNote.noteType;
 						sustainNote.scrollFactor.set();
 						sustainNote.parent = swagNote;
@@ -2010,6 +2032,18 @@ class PlayState extends MusicBeatState
 		}
 	}
 
+	public function searchLuaVar(variable:String, arg:String, result:Bool) {
+		#if LUA_ALLOWED
+		for (script in luaArray)
+		{
+			if (script.get(variable, arg) == result){
+				return result;
+			}
+		}
+		#end
+		return !result;
+	}
+
 	public function triggerEvent(eventName:String, value1:String, value2:String, strumTime:Float) {
 		var flValue1:Null<Float> = Std.parseFloat(value1);
 		var flValue2:Null<Float> = Std.parseFloat(value2);
@@ -2649,7 +2683,7 @@ class PlayState extends MusicBeatState
 			if (ClientPrefs.data.ghostTapping)
 				callOnScripts('onGhostTap', [key]);
 			else
-				noteMissPress(key);
+				noteMissPress(key, null);
 		}
 
 		// Needed for the  "Just the Two of Us" achievement.
@@ -2777,20 +2811,28 @@ class PlayState extends MusicBeatState
 				invalidateNote(note);
 		});
 
+		var dType:Int = 0;
+		if (daNote != null) dType = daNote.dType;
+		else if (!startingSong) dType = PlayState.SONG.notes[curSection].dType;
+
 		noteMissCommon(daNote.noteData, daNote);
 		stagesFunc(function(stage:BaseStage) stage.noteMiss(daNote));
-		var result:Dynamic = callOnLuas('noteMiss', [notes.members.indexOf(daNote), daNote.noteData, daNote.noteType, daNote.isSustainNote]);
+		var result:Dynamic = callOnLuas('noteMiss', [notes.members.indexOf(daNote), daNote.noteData, daNote.noteType, daNote.isSustainNote, daNote.dType]);
 		if(result != LuaUtils.Function_Stop && result != LuaUtils.Function_StopHScript && result != LuaUtils.Function_StopAll) callOnHScript('noteMiss', [daNote]);
 	}
 
-	function noteMissPress(direction:Int = 1):Void //You pressed a key when there was no notes to press for this key
+	function noteMissPress(direction:Int = 1, ?daNote:Note = null):Void //You pressed a key when there was no notes to press for this key
 	{
 		if(ClientPrefs.data.ghostTapping) return; //fuck it
+
+		var dType:Int = 0;
+		if (daNote != null) dType = daNote.dType;
+		else if (!startingSong) dType = PlayState.SONG.notes[curSection].dType;
 
 		noteMissCommon(direction);
 		FlxG.sound.play(Paths.soundRandom('missnote', 1, 3), FlxG.random.float(0.1, 0.2));
 		stagesFunc(function(stage:BaseStage) stage.noteMissPress(direction));
-		callOnScripts('noteMissPress', [direction]);
+		callOnScripts('noteMissPress', [direction, dType]);
 	}
 
 	function noteMissCommon(direction:Int, note:Note = null)
@@ -3232,7 +3274,7 @@ class PlayState extends MusicBeatState
 	}
 
 	#if LUA_ALLOWED
-	public function startLuasNamed(luaFile:String)
+	public function startLuasNamed(luaFile:String, ?type:String = "")
 	{
 		#if MODS_ALLOWED
 		var luaToLoad:String = Paths.modFolders(luaFile);
@@ -3248,15 +3290,37 @@ class PlayState extends MusicBeatState
 			for (script in luaArray)
 				if(script.scriptName == luaToLoad) return false;
 
-			new FunkinLua(luaToLoad);
+			new FunkinLua(luaToLoad, type);
 			return true;
+		}
+		return false;
+	}
+
+	public function stopLuasNamed(luaFile:String, ?type:String = "")
+	{
+		#if MODS_ALLOWED
+		var luaToLoad:String = Paths.modFolders(luaFile);
+		if(!FileSystem.exists(luaToLoad))
+			luaToLoad = Paths.getSharedPath(luaFile);
+
+		if(FileSystem.exists(luaToLoad))
+		#elseif sys
+		var luaToLoad:String = Paths.getSharedPath(luaFile);
+		if(OpenFlAssets.exists(luaToLoad))
+		#end
+		{
+			for (script in luaArray)
+				if(script.scriptName == luaToLoad){
+					luaArray.remove(script);
+					return true;
+				}
 		}
 		return false;
 	}
 	#end
 
 	#if HSCRIPT_ALLOWED
-	public function startHScriptsNamed(scriptFile:String)
+	public function startHScriptsNamed(scriptFile:String, ?scriptType:String = "")
 	{
 		#if MODS_ALLOWED
 		var scriptToLoad:String = Paths.modFolders(scriptFile);
@@ -3270,18 +3334,39 @@ class PlayState extends MusicBeatState
 		{
 			if (Iris.instances.exists(scriptToLoad)) return false;
 
-			initHScript(scriptToLoad);
+			initHScript(scriptToLoad, scriptType);
 			return true;
 		}
 		return false;
 	}
 
-	public function initHScript(file:String)
+	public function stopHScriptsNamed(scriptFile:String, ?scriptType:String = "")
+		{
+			#if MODS_ALLOWED
+			var scriptToLoad:String = Paths.modFolders(scriptFile);
+			if(!FileSystem.exists(scriptToLoad))
+				scriptToLoad = Paths.getSharedPath(scriptFile);
+			#else
+			var scriptToLoad:String = Paths.getSharedPath(scriptFile);
+			#end
+	
+			if(FileSystem.exists(scriptToLoad))
+			{
+				if (Iris.instances.exists(scriptToLoad)){
+					var script:HScript = cast (Iris.instances.get(scriptToLoad), HScript);
+					hscriptArray.remove(script);
+					return true;
+				};
+			}
+			return false;
+		}
+
+	public function initHScript(file:String, ?scriptType:String = "")
 	{
 		var newScript:HScript = null;
 		try
 		{
-			newScript = new HScript(null, file);
+			newScript = new HScript(null, file, scriptType);
 			if (newScript.exists('onCreate')) newScript.call('onCreate');
 			trace('initialized hscript interp successfully: $file');
 			hscriptArray.push(newScript);

@@ -2077,6 +2077,7 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 			var timeAdd:Float = beat * (rowRound / 4);
 			var mustHitSec:Bool = lastSection != null ? lastSection.mustHitSection : true;
 			var changeBpmSec:Bool = lastSection != null ? lastSection.changeBPM : false;
+			var dTypeVal:Int = lastSection != null ? lastSection.dType : 0;
 			var altAnimSec:Bool = lastSection != null ? lastSection.altAnim : false;
 			var gfSec:Bool = lastSection != null ? lastSection.gfSection : false;
 
@@ -2089,7 +2090,8 @@ class ChartingState extends MusicBeatState implements PsychUIEventHandler.PsychU
 					bpm: bpm,
 					changeBPM: changeBpmSec,
 					altAnim: altAnimSec,
-					gfSection: gfSec
+					gfSection: gfSec,
+					dType: dTypeVal
 				});
 
 				cachedSectionRow.push(row);
