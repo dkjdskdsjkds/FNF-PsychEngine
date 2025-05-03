@@ -1146,22 +1146,17 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		/////////////
 		// bg data //
 		/////////////
-		var canLoadBG:Bool = false;
+		#if !BASE_GAME_FILES
+ 		camEditor.bgColor = 0xFF666666;
+ 		#else
+ 		var bg:BGSprite = new BGSprite('stageback', -600, -200, 0.9, 0.9);
+ 		add(bg);
  
- 		#if BASE_GAME_FILES canLoadBG = true; #end
- 		#if ESSENTIAL_COVER_FILES canLoadBG = true; #end
- 
- 		if (!canLoadBG) {
- 			camEditor.bgColor = 0xFF666666;
- 		} else {
- 			var bg:BGSprite = new BGSprite('stageback', -600, -200, 0.9, 0.9);
- 			add(bg);
- 	
- 			var stageFront:BGSprite = new BGSprite('stagefront', -650, 600, 0.9, 0.9);
- 			stageFront.setGraphicSize(Std.int(stageFront.width * 1.1));
- 			stageFront.updateHitbox();
- 			add(stageFront);	
- 		}
+ 		var stageFront:BGSprite = new BGSprite('stagefront', -650, 600, 0.9, 0.9);
+ 		stageFront.setGraphicSize(Std.int(stageFront.width * 1.1));
+ 		stageFront.updateHitbox();
+ 		add(stageFront);
+ 		#end
 
 		dadPosition.set(100, 100);
 		bfPosition.set(770, 100);
